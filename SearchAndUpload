@@ -1,0 +1,133 @@
+import os
+import pandas as pd
+import pandas_gbq
+from pandas.io import gbq
+import win32timezone
+import datetime as dt
+import win32com.client
+import google.cloud.bigquery
+from tkinter import *
+from tkinter import messagebox
+
+class Window(Frame):
+
+    def __init__(self, master=None):
+        Frame.__init__(self, master)
+        self.master = master
+        self.init_window()
+
+    # Creation of init_window
+    def init_window(self):
+
+         # changing the title of our master widget
+         self.master.title("Search and Upload")
+
+         # allowing the widget to take the full space of the root window
+         self.pack(fill=BOTH, expand=1)
+
+         # label describing the Run button
+         runLabel = Label(self, text="Click me to Run the script")
+         runLabel.pack()
+         runLabel.place(x=100, y=125)
+
+         # the Run button and it's attributes
+         runButton = Button(self, text="Run", command=self.find_upload)
+         runButton.place(x=50, y=125)
+
+         # label describing the Run button
+         quitLabel = Label(self, text="Click me to Quit the program")
+         quitLabel.pack()
+         quitLabel.place(x=100, y=150)
+
+         # the Quit button and it's attributes
+         quitButton = Button(self, text="Quit", command=self.client_exit)
+         quitButton.place(x=50, y=150)
+
+    def find_upload(self):
+
+        # This is the location where the python script and xlsx files are saved
+        path = "C:\\Users\\username here\\PycharmProjects\\folder name here\\venv\\"
+
+        # Access Outlook application
+        outlook = win32com.client.Dispatch("Outlook.Application").GetNameSpace("MAPI")
+
+        # Inbox default index value is 6
+        inbox = outlook.GetDefaultFolder(6)
+
+        # Emails in Outlook inbox
+        messages = inbox.Items
+
+        # Today's date
+        today = dt.date.today().strftime("%m %d %y")
+
+        # Email address to match to
+        email_var_one = "email@email.com"
+        email_var_two = "email2@email2.com"
+
+        # For each message (m) in the list of messages (messages)
+        for m in messages:
+
+            # Match today's date to email sent date & sender address
+            if m.SenderEmailAddress == email_var_one or m.SenderEmailAddress == email_var_two and\
+                    m.senton.date().strftime('%m %d %y') == today:
+
+                # This will only display if sender address and email send date both match correctly
+                print("Correct email found. Got \'em saying Wow.")
+
+                # Following lines of code: find attachment from email and save as _____.xlsx into this location
+                attachments = m.Attachments
+                attachment = attachments.Item(1)
+                for attachment in m.Attachments:
+                    print(attachment)
+                attachment.SaveAsFile("{0}\\saved_file_name_here.xlsx".format(path))
+                print(path+"saved_file_name_here.xlsx")
+
+            # While the script looks for the matching email, it prints this message to let you know it's still looking
+            else:
+                print("thank you, next")
+
+        # Read in excel file of data
+        data_table_name = pd.read_excel(path + "saved_file_name_here.xlsx")
+
+        # Drops second row from re-formatted column headers/names
+        # data_table_name = data_table_name.drop(data_table_name.index[0])
+
+        # Re-naming column names/headers
+        data_table_name.columns = ['Header 1', 'Header 2', 'Header 3']
+
+        # Drop the whole first column
+        data_table_name.drop(data_table_name.columns[0], axis=1)
+
+        # Removes empty rows if date in the 'Pickup_Date' column
+        data_table_name = data_table_name[data_table_name["Header 1"].notnull()]
+
+        # Display data_table_name
+        print(data_table_name)
+
+        # Create backup of current BigQuery table and save as CSV
+        backup = data_table_name.to_csv(path + "data_table_name_backup.csv", index=False)
+
+        # Set project_id to project_id_here
+        project_id = "project_id_here"
+
+        # Upload data_table_name dataframe (df) to BiqQuery table
+        pd.DataFrame.to_gbq(data_table_name, "Google_Big_Query_Table_Name", project_id, reauth=False,
+                            if_exists="replace")
+
+        # Test to see if the script runs through the all the way with no issues
+        print("I feel like a Rockstar. Everything is good to go.")
+
+        # Once everything is done a pop up box displays the message below
+        messagebox.showinfo("Good News", "All good to go. Feel free to exit now.")
+
+    # close the program function
+    def client_exit(self):
+        exit()
+
+root = Tk()
+
+# size of the window
+root.geometry("300x300")
+
+app = Window(root)
+root.mainloop()
